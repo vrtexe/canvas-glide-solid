@@ -1,6 +1,6 @@
 {
   "name": "@canvas-glide/solid",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Solid components for canvas-glide: pan, zoom and pinch-to-zoom for images on a canvas, an img or a scrolled view, with mouse, touch, pen and wheel input.",
   "keywords": [
     "solid",
