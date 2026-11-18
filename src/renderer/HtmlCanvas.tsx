@@ -29,9 +29,10 @@ export function HtmlCanvas(props: HtmlRendererProps) {
     revokeImageUrl,
   );
 
-  const { idealScale, updateIdealScale, getImageRect } = createIdealScale(
+  const { idealScale, updateIdealScale, getImageRect, fitNext } = createIdealScale(
     () => props.viewportRef,
     () => (imgRef ? { width: imgRef.naturalWidth, height: imgRef.naturalHeight } : null),
+    () => props.lib?.fit(),
   );
 
   function draw(transform?: Transform) {
@@ -70,9 +71,8 @@ export function HtmlCanvas(props: HtmlRendererProps) {
   }
 
   function onImageLoad() {
+    fitNext();
     updateIdealScale();
-
-    props.lib?.fit();
     redraw();
   }
 

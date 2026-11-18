@@ -40,9 +40,10 @@ export function Canvas(props: CanvasRendererProps) {
     if (canvasContext) applySmoothing(canvasContext);
   });
 
-  const { idealScale, updateIdealScale, getImageRect } = createIdealScale(
+  const { idealScale, updateIdealScale, getImageRect, fitNext } = createIdealScale(
     () => props.viewportRef,
     () => ({ width: offscreenCanvas.width, height: offscreenCanvas.height }),
+    () => props.lib?.fit(),
   );
 
   createEffect(() => {
@@ -55,10 +56,10 @@ export function Canvas(props: CanvasRendererProps) {
     }
 
     updateOffscreenCanvas(bitmap);
+    fitNext();
     handleViewportResize(props.viewportRef);
     updateIdealScale();
 
-    props.lib?.fit();
     draw(props.lib?.stateService.getTransform());
   });
 

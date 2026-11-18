@@ -15,13 +15,21 @@ import {
 } from "../src/canvas-glide.ts";
 
 // jsdom has no layout, no ResizeObserver, no 2D context and no createImageBitmap.
-globalThis.ResizeObserver ??= class {
-  observe() {}
+const resizeCallbacks = new Set<() => void>();
+globalThis.ResizeObserver = class {
+  constructor(private callback: () => void) {}
+  observe() {
+    resizeCallbacks.add(this.callback);
+  }
   unobserve() {}
-  disconnect() {}
-};
-Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 1000 });
-Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => 700 });
+  disconnect() {
+    resizeCallbacks.delete(this.callback);
+  }
+} as unknown as typeof ResizeObserver;
+let layout = { width: 1000, height: 700 };
+Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => layout.width });
+Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => layout.height });
+Element.prototype.scrollTo ??= () => {};
 globalThis.createImageBitmap = (async () => ({ width: 300, height: 300, close() {} })) as unknown as typeof createImageBitmap;
 
 type FakeContext = { calls: string[] };
@@ -51,6 +59,7 @@ afterEach(() => {
   host?.remove();
   dispose = undefined;
   setDevicePixelRatio(1);
+  layout = { width: 1000, height: 700 };
 });
 
 function mount(component: () => JSX.Element) {
@@ -181,4 +190,47 @@ test("renderer content and container options stay reactive after mount", async (
 
   assert.equal(host!.querySelector("img")!.style.outline, "1px solid blue");
   assert.equal(host!.querySelector("img")!.parentElement!.className, "blue");
+});
+
+/** Mounts a GlideCanvas whose viewport reports `layout` as its rectangle; img renderers get a 300×300 natural size. */
+async function mountLoaded(renderer: Renderer) {
+  let glide!: GlideCanvasRef;
+  mount(() => <GlideCanvas ref={glide} renderer={renderer} image={new Blob(["x"], { type: "image/png" })} />);
+  glide.viewportRef!.getElement()!.getBoundingClientRect = () => ({ x: 0, y: 0, ...layout }) as DOMRect;
+  await settle();
+  const img = host!.querySelector("img");
+  if (img) {
+    Object.defineProperties(img, { naturalWidth: { value: 300 }, naturalHeight: { value: 300 } });
+    img.dispatchEvent(new Event("load"));
+    await settle();
+  }
+  return glide;
+}
+
+function resize(size: { width: number; height: number }) {
+  layout = size;
+  resizeCallbacks.forEach((callback) => callback());
+}
+
+for (const renderer of Object.values(Renderer)) {
+  test(`the ${renderer} renderer fits an image that loaded before the viewport had a size once it has one`, async () => {
+    layout = { width: 0, height: 0 };
+    const glide = await mountLoaded(renderer);
+
+    resize({ width: 1000, height: 700 });
+    await settle();
+
+    // A 300×300 image contained in 1000×700 is 700×700, centered horizontally.
+    assert.deepEqual(glide.getTransform(), { scale: 1, origin: { x: -150, y: 0 } });
+  });
+}
+
+test("a resize after the image was fitted keeps the current view", async () => {
+  const glide = await mountLoaded(Renderer.Canvas);
+  glide.panTo({ x: 10, y: 20 });
+
+  resize({ width: 800, height: 600 });
+  await settle();
+
+  assert.deepEqual(glide.getOrigin(), { x: 10, y: 20 });
 });
