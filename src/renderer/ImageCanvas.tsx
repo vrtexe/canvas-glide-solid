@@ -34,9 +34,10 @@ export function ImageCanvas(props: ImageRendererProps) {
     revokeImageUrl,
   );
 
-  const { idealScale, updateIdealScale, getImageRect } = createIdealScale(
+  const { idealScale, updateIdealScale, getImageRect, fitNext } = createIdealScale(
     () => props.viewportRef,
     () => (imgRef ? { width: imgRef.naturalWidth, height: imgRef.naturalHeight } : null),
+    () => props.lib?.fit(),
   );
 
   // The transform is written imperatively — pan/zoom never touches reactive
@@ -68,12 +69,11 @@ export function ImageCanvas(props: ImageRendererProps) {
   }
 
   function onImageLoad() {
-    updateIdealScale();
-    updateSize();
-
     // Content is measurable now — center the freshly loaded image. fit() only
     // emits when the transform actually changes, so redraw explicitly too.
-    props.lib?.fit();
+    fitNext();
+    updateIdealScale();
+    updateSize();
     redraw();
     setImageVisibility('visible');
   }
